@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="cyber">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PassLab — offline password security console</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ============================================================
+     CONSENT GATE — must be accepted before anything else loads
+     ============================================================ -->
+<div id="consentGate" class="overlay">
+  <div class="consent-card">
+    <div class="consent-icon">⛨</div>
+    <h1>Before you begin</h1>
+    <p class="consent-body">
+      PassLab runs <strong>entirely inside this browser tab</strong>. There is no server.
+      Nothing you type — passwords, profile details, generated passwords — is ever sent
+      over the network. Everything lives only in this tab's memory and disappears when
+      you close or refresh the page.
+    </p>
+    <ul class="consent-list">
+      <li>No analytics, no tracking, no external requests</li>
+      <li>Passwords are analyzed locally and never logged to disk</li>
+      <li>Closing this tab permanently erases your session profile and history</li>
+    </ul>
+    <label class="consent-check">
+      <input type="checkbox" id="consentCheckbox">
+      <span>I understand this tool is for local, educational, and personal security analysis only.</span>
+    </label>
+    <button id="consentAccept" class="btn-primary" disabled>Continue</button>
+  </div>
+</div>
+
+<!-- ============================================================
+     LOGIN / LOCAL PROFILE SCREEN
+     ============================================================ -->
+<div id="authScreen" class="overlay hidden">
+  <div class="auth-card">
+    <div class="auth-brand">
+      <span class="brand-mark">⛨</span>
+      <span class="brand-name">PASS<b>LAB</b></span>
+    </div>
+    <p class="auth-subtitle">Local session profile — not an account. Nothing leaves this device.</p>
+
+    <div class="auth-tabs">
+      <button class="auth-tab active" data-tab="signin">Sign in</button>
+      <button class="auth-tab" data-tab="signup">Create profile</button>
+    </div>
+
+    <form id="signinForm" class="auth-form">
+      <label>Profile name
+        <input type="text" id="signinName" placeholder="e.g. alex" autocomplete="off" required>
+      </label>
+      <label>Local passphrase
+        <div class="pw-field-wrap">
+          <input type="password" id="signinPass" placeholder="Your local passphrase" autocomplete="off" required>
+          <button type="button" class="pw-toggle" data-target="signinPass" aria-label="Show password">👁</button>
+        </div>
+      </label>
+      <p class="auth-error" id="signinError"></p>
+      <button type="submit" class="btn-primary full-width">Sign in</button>
+    </form>
+
+    <form id="signupForm" class="auth-form hidden">
+      <label>Choose a profile name
+        <input type="text" id="signupName" placeholder="e.g. alex" autocomplete="off" required>
+      </label>
+      <label>Choose a local passphrase
+        <div class="pw-field-wrap">
+          <input type="password" id="signupPass" placeholder="Used only to lock this tab session" autocomplete="off" required>
+          <button type="button" class="pw-toggle" data-target="signupPass" aria-label="Show password">👁</button>
+        </div>
+      </label>
+      <label>Display email <span class="optional">optional, stored locally only</span>
+        <input type="email" id="signupEmail" placeholder="you@example.com (never transmitted)" autocomplete="off">
+      </label>
+      <label class="consent-check small">
+        <input type="checkbox" id="signupConsent" required>
+        <span>I consent to PassLab storing this profile in this browser tab's memory only, for this session.</span>
+      </label>
+      <p class="auth-error" id="signupError"></p>
+      <button type="submit" class="btn-primary full-width">Create local profile</button>
+    </form>
+
+    <p class="auth-footnote">This is not real authentication. There is no backend, no password recovery, and no account database. Refreshing the page clears everything.</p>
+  </div>
+</div>
+
+<!-- ============================================================
+     MAIN APP
+     ============================================================ -->
+<div id="app" class="hidden">
+
+  <!-- TOP NAV -->
+  <header class="topbar">
+    <div class="topbar-left">
+      <button id="menuToggle" class="icon-btn" aria-label="Toggle menu">☰</button>
+      <span class="brand-mark">⛨</span>
+      <span class="brand-name">PASS<b>LAB</b></span>
+    </div>
+    <nav class="topbar-nav" id="topNav">
+      <button class="nav-link active" data-view="analyzer">Analyzer</button>
+      <button class="nav-link" data-view="generator">Generator</button>
+      <button class="nav-link" data-view="learn">Learn</button>
+      <button class="nav-link" data-view="profile">Profile</button>
+    </nav>
+    <div class="topbar-right">
+      <button id="themeToggle" class="icon-btn" title="Toggle black & white theme">◐</button>
+      <button id="logoutBtn" class="icon-btn" title="Sign out">⏻</button>
+    </div>
+  </header>
+
+  <!-- SIDE MENU (mobile) -->
+  <div id="sideMenu" class="side-menu hidden">
+    <button class="nav-link active" data-view="analyzer">Analyzer</button>
+    <button class="nav-link" data-view="generator">Generator</button>
+    <button class="nav-link" data-view="learn">Learn</button>
+    <button class="nav-link" data-view="profile">Profile</button>
+  </div>
+
+  <main class="main-content">
+
+    <!-- ===================== ANALYZER VIEW ===================== -->
+    <section id="view-analyzer" class="view active">
+      <div class="view-grid">
+
+        <div class="card card-input">
+          <h2><span class="card-icon">▣</span> Password input</h2>
+          <div class="pw-field-wrap large">
+            <input type="password" id="pwInput" placeholder="Type a password to analyze" autocomplete="off" spellcheck="false">
+            <button type="button" class="pw-toggle" data-target="pwInput" aria-label="Show password">👁</button>
+          </div>
+          <div class="input-actions">
+            <button id="clearBtn" class="btn-ghost">Clear</button>
+            <span class="char-count" id="charCount">0 characters</span>
+          </div>
+          <p class="local-note">⛨ Analyzed locally. This password is never transmitted or stored on disk.</p>
+        </div>
+
+        <div class="card card-meter">
+          <h2><span class="card-icon">◈</span> Strength meter</h2>
+          <div class="strength-meter" id="strengthMeter">
+            <div class="meter-segment" data-seg="0"></div>
+            <div class="meter-segment" data-seg="1"></div>
+            <div class="meter-segment" data-seg="2"></div>
+            <div class="meter-segment" data-seg="3"></div>
+            <div class="meter-segment" data-seg="4"></div>
+          </div>
+          <div class="strength-label-row">
+            <span class="strength-emoji" id="strengthEmoji">○</span>
+            <span class="strength-text" id="strengthText">Enter a password</span>
+          </div>
+        </div>
+
+        <div class="card card-checklist">
+          <h2><span class="card-icon">☑</span> Rule checklist</h2>
+          <ul class="checklist" id="checklist"></ul>
+        </div>
+
+        <div class="card card-score">
+          <h2><span class="card-icon">#</span> Password score</h2>
+          <div class="score-display">
+            <span class="score-number" id="scoreNumber">0</span>
+            <span class="score-max">/100</span>
+          </div>
+          <div class="score-breakdown" id="scoreBreakdown"></div>
+        </div>
+
+        <div class="card card-cracktime">
+          <h2><span class="card-icon">⏱</span> Estimated crack time</h2>
+          <div class="cracktime-display" id="cracktimeDisplay">—</div>
+          <p class="cracktime-note">Estimated against an offline attack at 10 billion guesses/sec. Real-world results vary by attacker hardware and method.</p>
+          <div class="entropy-row">Entropy: <span id="entropyValue">0</span> bits</div>
+        </div>
+
+        <div class="card card-warnings" id="warningsCard" style="display:none">
+          <h2><span class="card-icon">⚠</span> Security warnings</h2>
+          <div id="warningsList"></div>
+        </div>
+
+        <div class="card card-suggestions">
+          <h2><span class="card-icon">↑</span> Suggestions</h2>
+          <ul class="suggestions-list" id="suggestionsList"></ul>
+        </div>
+
+        <div class="card card-tips">
+          <h2><span class="card-icon">●</span> Security tips</h2>
+          <ul class="tips-list">
+            <li>Never reuse passwords across sites</li>
+            <li>Enable two-factor authentication wherever offered</li>
+            <li>Use a password manager to store unique passwords</li>
+            <li>Don't share passwords, even with people you trust</li>
+            <li>Update sensitive passwords periodically</li>
+          </ul>
+        </div>
+
+      </div>
+
+      <div class="extra-actions">
+        <button id="speakBtn" class="btn-ghost">🔊 Voice feedback</button>
+        <button id="exportBtn" class="btn-ghost">⬇ Export report</button>
+        <label class="btn-ghost as-label">
+          <input type="checkbox" id="saveHistoryToggle">
+          Save this result to my session history
+        </label>
+      </div>
+    </section>
+
+    <!-- ===================== GENERATOR VIEW ===================== -->
+    <section id="view-generator" class="view">
+      <div class="card card-generator">
+        <h2><span class="card-icon">⚙</span> Generate a strong password</h2>
+
+        <label class="gen-row">
+          <span>Length: <b id="genLengthOut">16</b></span>
+          <input type="range" id="genLength" min="6" max="32" value="16">
+        </label>
+
+        <div class="gen-checks">
+          <label><input type="checkbox" id="genUpper" checked> Uppercase (A–Z)</label>
+          <label><input type="checkbox" id="genLower" checked> Lowercase (a–z)</label>
+          <label><input type="checkbox" id="genNumbers" checked> Numbers (0–9)</label>
+          <label><input type="checkbox" id="genSymbols" checked> Symbols (!@#$...)</label>
+        </div>
+
+        <button id="generateBtn" class="btn-primary full-width">Generate password</button>
+
+        <div class="gen-result hidden" id="genResultWrap">
+          <div class="gen-result-field">
+            <code id="genResult"></code>
+            <button id="copyGenBtn" class="icon-btn" title="Copy to clipboard">⧉</button>
+          </div>
+          <div class="gen-result-meta" id="genResultMeta"></div>
+          <button id="analyzeGenBtn" class="btn-ghost">Send to analyzer ↑</button>
+        </div>
+
+        <div class="gen-history">
+          <h3>Session history <span class="optional">(cleared when tab closes)</span></h3>
+          <ul id="genHistoryList" class="gen-history-list"></ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== LEARN VIEW ===================== -->
+    <section id="view-learn" class="view">
+      <div class="learn-grid">
+        <div class="card">
+          <h2>Why length matters more than complexity</h2>
+          <p>Every extra character multiplies the number of guesses an attacker needs by the size of the character set you used. A 16-character password built from lowercase letters alone is often harder to brute-force than an 8-character password stuffed with symbols, because length grows the search space exponentially while complexity only grows it linearly per character.</p>
+        </div>
+        <div class="card">
+          <h2>What dictionary attacks are</h2>
+          <p>Instead of trying every possible combination, attackers first try real words, names, and known leaked passwords, because people reuse them constantly. A password built from a dictionary word, even with numbers tacked on, falls almost immediately to this method.</p>
+        </div>
+        <div class="card">
+          <h2>What brute-force attacks are</h2>
+          <p>A brute-force attack tries every possible character combination systematically until it finds a match. Modern hardware can attempt billions of combinations per second offline, which is why short or low-complexity passwords fall in seconds.</p>
+        </div>
+        <div class="card">
+          <h2>Why symbols and numbers help</h2>
+          <p>Mixing character types (upper, lower, digits, symbols) expands the pool of possible characters at each position, which compounds across the whole password length to dramatically increase the number of guesses required.</p>
+        </div>
+        <div class="card">
+          <h2>Best practices</h2>
+          <ul>
+            <li>Use a unique password for every account</li>
+            <li>Prefer length (14+ characters) over forced complexity</li>
+            <li>Use a password manager rather than memorizing variations</li>
+            <li>Turn on two-factor authentication everywhere it's offered</li>
+            <li>Avoid personal information: names, birthdays, pet names</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== PROFILE VIEW ===================== -->
+    <section id="view-profile" class="view">
+      <div class="card card-profile">
+        <h2><span class="card-icon">◉</span> Your local profile</h2>
+        <p class="local-note">⛨ This data exists only in this browser tab's memory. It is never sent anywhere and disappears on refresh.</p>
+
+        <div class="profile-grid">
+          <div class="profile-avatar" id="profileAvatar">A</div>
+          <div class="profile-fields">
+            <label>Profile name
+              <input type="text" id="profileName">
+            </label>
+            <label>Display email <span class="optional">optional</span>
+              <input type="email" id="profileEmail">
+            </label>
+            <label>Session started
+              <input type="text" id="profileStarted" disabled>
+            </label>
+          </div>
+        </div>
+
+        <button id="saveProfileBtn" class="btn-primary">Save changes</button>
+        <span class="save-confirm hidden" id="saveConfirm">Saved to this session ✓</span>
+
+        <div class="profile-stats">
+          <h3>This session at a glance</h3>
+          <div class="stats-row">
+            <div class="stat-box"><span class="stat-num" id="statAnalyzed">0</span><span class="stat-label">Passwords analyzed</span></div>
+            <div class="stat-box"><span class="stat-num" id="statGenerated">0</span><span class="stat-label">Passwords generated</span></div>
+            <div class="stat-box"><span class="stat-num" id="statSaved">0</span><span class="stat-label">Saved to history</span></div>
+          </div>
+        </div>
+
+        <div class="profile-danger">
+          <h3>Danger zone</h3>
+          <button id="wipeBtn" class="btn-danger">Erase all local session data</button>
+          <p class="optional">Clears your profile, generator history, and saved results from this tab immediately.</p>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="app-footer">
+    <span>PassLab runs 100% offline in your browser. No data is ever transmitted.</span>
+  </footer>
+</div>
+
+<!-- Toast for consent confirmations -->
+<div id="toast" class="toast hidden"></div>
+
+<script src="engine.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
